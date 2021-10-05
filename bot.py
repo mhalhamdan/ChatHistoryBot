@@ -1,7 +1,7 @@
 import discord
 from datetime import datetime
 
-TOKEN = 'ODk0NzU4NDI1ODIzNjg2NzA2.YVuquA.KOSMM3PO9YbhxhmNT9f3FKrZDV4'
+TOKEN = 'token here'
 
 client = discord.Client()
 
