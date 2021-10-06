@@ -1,20 +1,25 @@
 import discord
 from datetime import datetime
+import datetime as dt
 import json
 
 TOKEN = 'token here'
 
 client = discord.Client()
 
-# Initialize variables
-history_dict = {}
 # RESET_THRESHOLD = 1000
+TIME_FORMAT = '%Y-%m-%d %H:%M:%S.%f'
+
 SECONDS_DICTIONARY = {
     "seconds": 1,
     "minutes": 60,
     "hours": 3600,
     "days": 3600*24
 }
+
+def round_seconds(time):
+    x = time - dt.timedelta(microseconds=time.microsecond)
+    return x
 
 
 class History(object):
@@ -73,23 +78,23 @@ async def on_message_delete(message):
 
     deleted_time = datetime.utcnow()
 
-    if int(message.author.id) in history.history_dict.keys():
+    if str(message.author.id) in history.history_dict.keys():
         # Format: current message.id : old message content
-        history.history_dict[int(message.author.id)].append((message.content, deleted_time))
+        history.history_dict[str(message.author.id)].append((message.content, str(deleted_time)))
         history.save_history()
     else:
-        history.history_dict[int(message.author.id)] = [(message.content, deleted_time)]
+        history.history_dict[str(message.author.id)] = [(message.content, str(deleted_time))]
         history.save_history()
 
 @client.event
 async def on_message_edit(before, after):
     
-    if before.id in history.history_dict.keys():
+    if str(before.id) in history.history_dict.keys():
         # Format: current message.id : old message content
-        history.history_dict[before.id].append((before.content, after.edited_at))
+        history.history_dict[str(before.id)].append((before.content, str(after.edited_at)))
         history.save_history()
     else:
-        history.history_dict[after.id] = [(before.content, after.edited_at)]
+        history.history_dict[str(after.id)] = [(before.content, str(after.edited_at))]
         history.save_history()
 
 
@@ -101,9 +106,9 @@ async def on_message(message):
         if message.reference is not None:
             message = await message.channel.fetch_message(message.reference.message_id) 
 
-            if message.id in history_dict.keys():
+            if str(message.id) in history.history_dict.keys():
 
-                archive = history_dict[message.id]
+                archive = history.history_dict[str(message.id)]
 
                 if len(archive) == 1:
                     return await message.reply(f"Message before edit: {archive[0][0]}")
@@ -111,7 +116,7 @@ async def on_message(message):
                 if len(archive) > 1:
                     response = "The message was edited more than once.\nThe complete message history is the following:\n"
                     for index, instance in enumerate(archive):
-                        time_diff, type = find_time_diff(instance[1], datetime.utcnow())
+                        time_diff, type = find_time_diff(datetime.strptime(instance[1], TIME_FORMAT), datetime.utcnow())
                         response = f"{response}{index+1}-{instance[0]} @ {time_diff} {type} ago\n"
                     return await message.reply(response)
             else:
@@ -123,8 +128,8 @@ async def on_message(message):
             return await message.channel.send("The correct arguments are: -history <user> <no. of hours>")
 
         # If references an author, to find deleted messages
-        elif int(content[1].strip("<").strip(">").strip("@").strip("!")) in history.history_dict.keys():
-            archive = history.history_dict[int(content[1].strip("<").strip(">").strip("@").strip("!"))]
+        elif (content[1].strip("<").strip(">").strip("@").strip("!")) in history.history_dict.keys():
+            archive = history.history_dict[(content[1].strip("<").strip(">").strip("@").strip("!"))]
             print(archive)
             if len(archive) == 1:
                 return await message.reply(f"User has one deleted message: {archive[0][0]}")
@@ -135,9 +140,12 @@ async def on_message(message):
                 THRESHOLD = int(content[2])*3600
 
                 for index, instance in enumerate(archive):
-                    time_diff, type = find_time_diff(instance[1], datetime.utcnow(), "seconds")
-                    if time_diff > THRESHOLD:
-                        break
+                    time_diff, type = find_time_diff(datetime.strptime(instance[1], TIME_FORMAT), datetime.utcnow())
+                    
+                    compare = THRESHOLD / SECONDS_DICTIONARY[type]
+
+                    if time_diff > compare:
+                        break 
                     response = f"{response}{index+1}-{instance[0]} @ {time_diff} {type} ago\n"
 
                 return await message.reply(response)
