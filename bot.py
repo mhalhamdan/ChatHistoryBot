@@ -1,5 +1,6 @@
 import discord
 from datetime import datetime
+import json
 
 TOKEN = 'token here'
 
@@ -14,11 +15,35 @@ SECONDS_DICTIONARY = {
     "hours": 3600,
     "days": 3600*24
 }
+
+
+class History(object):
+
+    history_dict = {}
+
+    def __init__(self):
+        self.history_dict = {}
+
+    def save_history(self):
+        with open('history.json', 'w') as fp:
+            json.dump(self.history_dict, fp)
+
+    def load_history(self):
+        with open('history.json', 'r') as fp:
+            self.history_dict = json.load(fp)
+
+history = History()
+
+try:
+    history.load_history()
+except:
+    print("ERROR: Couldn't load history")
+    
 # Input datetime object
 # Return time difference in either seconds, minutes, or hours, etc.
 def find_time_diff(date_a, date_b, enforce_type=False):
 
-    time_delta = (date_b - date_a)
+    time_delta = date_b - date_a
     duration = time_delta.total_seconds()
     type = "seconds"
 
@@ -30,12 +55,12 @@ def find_time_diff(date_a, date_b, enforce_type=False):
     if duration > 60: # s -> m
         duration /= 60
         type = "minutes"
-    if duration > 60: # m -> h
-        duration /= 60
-        type = "hours"
-    if duration > 24: # h -> d
-        duration /= 24
-        type = "days"
+        if duration > 60: # m -> h
+            duration /= 60
+            type = "hours"
+            if duration > 24: # h -> d
+                duration /= 24
+                type = "days"
     
     return round(duration, 2), type
 
@@ -48,20 +73,25 @@ async def on_message_delete(message):
 
     deleted_time = datetime.utcnow()
 
-    if int(message.author.id) in history_dict.keys():
+    if int(message.author.id) in history.history_dict.keys():
         # Format: current message.id : old message content
-        history_dict[int(message.author.id)].append((message.content, deleted_time))
+        history.history_dict[int(message.author.id)].append((message.content, deleted_time))
+        history.save_history()
     else:
-        history_dict[int(message.author.id)] = [(message.content, deleted_time)]
+        history.history_dict[int(message.author.id)] = [(message.content, deleted_time)]
+        history.save_history()
 
 @client.event
 async def on_message_edit(before, after):
     
-    if before.id in history_dict.keys():
+    if before.id in history.history_dict.keys():
         # Format: current message.id : old message content
-        history_dict[before.id].append((before.content, after.edited_at))
+        history.history_dict[before.id].append((before.content, after.edited_at))
+        history.save_history()
     else:
-        history_dict[after.id] = [(before.content, after.edited_at)]
+        history.history_dict[after.id] = [(before.content, after.edited_at)]
+        history.save_history()
+
 
 @client.event
 async def on_message(message):
@@ -93,8 +123,8 @@ async def on_message(message):
             return await message.channel.send("The correct arguments are: -history <user> <no. of hours>")
 
         # If references an author, to find deleted messages
-        elif int(content[1].strip("<").strip(">").strip("@").strip("!")) in history_dict.keys():
-            archive = history_dict[int(content[1].strip("<").strip(">").strip("@").strip("!"))]
+        elif int(content[1].strip("<").strip(">").strip("@").strip("!")) in history.history_dict.keys():
+            archive = history.history_dict[int(content[1].strip("<").strip(">").strip("@").strip("!"))]
             print(archive)
             if len(archive) == 1:
                 return await message.reply(f"User has one deleted message: {archive[0][0]}")
@@ -111,8 +141,6 @@ async def on_message(message):
                     response = f"{response}{index+1}-{instance[0]} @ {time_diff} {type} ago\n"
 
                 return await message.reply(response)
-
-
 
         
 client.run(TOKEN)
