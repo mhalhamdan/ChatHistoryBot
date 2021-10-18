@@ -133,7 +133,10 @@ async def on_message(message):
             print(archive)
             if len(archive) == 1:
                 return await message.reply(f"User has one deleted message: {archive[0][0]}")
-                
+
+            # Reverse archive to iterate from the most recent message
+            archive.reverse()
+
             if len(archive) > 1:
                 response = f"User deleted the following messages in the past {content[2]} hour:\n"
                 # In seconds
