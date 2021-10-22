@@ -130,10 +130,9 @@ async def on_message(message):
         # If references an author, to find deleted messages
         elif (content[1].strip("<").strip(">").strip("@").strip("!")) in history.history_dict.keys():
             archive = history.history_dict[(content[1].strip("<").strip(">").strip("@").strip("!"))]
-            print(archive)
             if len(archive) == 1:
                 return await message.reply(f"User has one deleted message: {archive[0][0]}")
-
+                
             # Reverse archive to iterate from the most recent message
             archive.reverse()
 
@@ -146,10 +145,18 @@ async def on_message(message):
                     time_diff, type = find_time_diff(datetime.strptime(instance[1], TIME_FORMAT), datetime.utcnow())
                     
                     compare = THRESHOLD / SECONDS_DICTIONARY[type]
-
+                    
+                    # If beyond time difference
                     if time_diff > compare:
                         break 
+
+                    # If length is bigger than the max, return what is available
+                    if len(f"{response}{index+1}-{instance[0]} @ {time_diff} {type} ago\n") > 1900:
+                        response = f"{response}*some results were omitted because the history exceeded the allowed size"
+                        break
+
                     response = f"{response}{index+1}-{instance[0]} @ {time_diff} {type} ago\n"
+
 
                 return await message.reply(response)
 
